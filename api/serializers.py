@@ -1,25 +1,113 @@
 # serializers.py
 from rest_framework import serializers
 from .models import Climate, Planet, Terrain
+import re
 
 class TerrainSerializer(serializers.ModelSerializer):
     """Serializer for Terrain model"""
-    
+
+    name = serializers.CharField(
+        max_length=100,
+        min_length=2,
+        help_text="Terrain name (2-100 characters)",
+        error_messages={
+            'required': 'Terrain name is required.',
+            'blank': 'Terrain name cannot be empty.',
+            'min_length': 'Terrain name must be at least 2 characters long.',
+            'max_length': 'Terrain name cannot exceed 100 characters.',
+        }
+    )
     class Meta:
         model = Terrain
         fields = ['name', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
+    def validate_name(self, value):
+            """Custom validation for terrain name"""
+            if not value or not value.strip():
+                raise serializers.ValidationError("Terrain name cannot be empty or whitespace only.")
+            
+            # Clean the name
+            cleaned_name = value.strip()
+            
+            # Check for invalid characters (allow letters, numbers, spaces, hyphens, apostrophes)
+            if not re.match(r"^[a-zA-Z0-9\s\-']+$", cleaned_name):
+                raise serializers.ValidationError(
+                    "Terrain name can only contain letters, numbers, spaces, hyphens, and apostrophes."
+                )
+            
+            # Check for reserved words
+            reserved_words = ['unknown', 'null', 'undefined', 'none']
+            if cleaned_name.lower() in reserved_words:
+                raise serializers.ValidationError(f"'{cleaned_name}' is a reserved word and cannot be used.")
+            
+            return cleaned_name
+
 class ClimateSerializer(serializers.ModelSerializer):
     """Serializer for Climate model"""
-    
+
+    name = serializers.CharField(
+        max_length=100,
+        min_length=2,
+        help_text="Climate name (2-100 characters)",
+        error_messages={
+            'required': 'Climate name is required.',
+            'blank': 'Climate name cannot be empty.',
+            'min_length': 'Climate name must be at least 2 characters long.',
+            'max_length': 'Climate name cannot exceed 100 characters.',
+        }
+    )
     class Meta:
         model = Climate
         fields = ['name', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
+    def validate_name(self, value):
+        """Custom validation for climate name"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Climate name cannot be empty or whitespace only.")
+        
+        # Clean the name
+        cleaned_name = value.strip()
+        
+        # Check for invalid characters
+        if not re.match(r"^[a-zA-Z0-9\s\-'&/]+$", cleaned_name):
+            raise serializers.ValidationError(
+                "Climate name can only contain letters, numbers, spaces, hyphens, apostrophes, ampersands, and slashes."
+            )
+        
+        # Check for reserved words
+        reserved_words = ['unknown', 'null', 'undefined', 'none']
+        if cleaned_name.lower() in reserved_words:
+            raise serializers.ValidationError(f"'{cleaned_name}' is a reserved word and cannot be used.")
+        
+        return cleaned_name
+
 class PlanetSerializer(serializers.ModelSerializer):
     """Serializer for Planet model with validation"""
+    name = serializers.CharField(
+        max_length=200,
+        min_length=2,
+        help_text="Planet name (2-200 characters)",
+        error_messages={
+            'required': 'Planet name is required.',
+            'blank': 'Planet name cannot be empty.',
+            'min_length': 'Planet name must be at least 2 characters long.',
+            'max_length': 'Planet name cannot exceed 200 characters.',
+        }
+    )
+    
+    population = serializers.CharField(
+        max_length=50,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Planet population (optional, max 50 characters)",
+        error_messages={
+            'max_length': 'Population cannot exceed 50 characters.',
+        }
+    )
+
     terrains = serializers.SlugRelatedField(
         many=True,
         slug_field='name',
