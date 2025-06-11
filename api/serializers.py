@@ -1,13 +1,54 @@
 # serializers.py
 from rest_framework import serializers
-from .models import Planet
+from .models import Climate, Planet, Terrain
+
+class TerrainSerializer(serializers.ModelSerializer):
+    """Serializer for Terrain model"""
+    
+    class Meta:
+        model = Terrain
+        fields = ['name', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
+
+class ClimateSerializer(serializers.ModelSerializer):
+    """Serializer for Climate model"""
+    
+    class Meta:
+        model = Climate
+        fields = ['name', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
 
 class PlanetSerializer(serializers.ModelSerializer):
     """Serializer for Planet model with validation"""
+
+    # Nested serializers for read operations
+    terrains = TerrainSerializer(many=True, read_only=True)
+    climates = ClimateSerializer(many=True, read_only=True)
+
+     # Use SlugRelatedField to reference by name (the primary key)
+    terrain_names = serializers.SlugRelatedField(
+        queryset=Terrain.objects.all(),
+        many=True,
+        slug_field='name',
+        source='terrains',
+        write_only=True,
+        required=False,
+        help_text="List of terrain names"
+    )
+    
+    climate_names = serializers.SlugRelatedField(
+        queryset=Climate.objects.all(),
+        many=True,
+        slug_field='name',
+        source='climates',
+        write_only=True,
+        required=False,
+        help_text="List of climate names"
+    )
     
     class Meta:
         model = Planet
-        fields = ['id', 'name', 'population', 'terrains', 'climates', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'population', 'terrains', 'climates', 'created_at', 'updated_at', 'climate_names', 'terrain_names']
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def validate_name(self, value):
@@ -16,25 +57,37 @@ class PlanetSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Planet name must be at least 2 characters long.")
         return value.strip().title()
     
-    def validate_terrains(self, value):
-        """Validate terrains is a list of strings"""
-        if value is not None and not isinstance(value, list):
-            raise serializers.ValidationError("Terrains must be a list of strings.")
-        if value is not None:
-            for terrain in value:
-                if not isinstance(terrain, str):
-                    raise serializers.ValidationError("Each terrain must be a string.")
-        return value
-    
-    def validate_climates(self, value):
-        """Validate climates is a list of strings"""
-        if value is not None and not isinstance(value, list):
-            raise serializers.ValidationError("Climates must be a list of strings.")
-        if value is not None:
-            for climate in value:
-                if not isinstance(climate, str):
-                    raise serializers.ValidationError("Each climate must be a string.")
-        return value
+    def create(self, validated_data):
+        """Create planet with terrain and climate relationships"""
+        terrains = validated_data.pop('terrains', [])
+        climates = validated_data.pop('climates', [])
+        
+        planet = Planet.objects.create(**validated_data)
+        
+        if terrains:
+            planet.terrains.set(terrains)
+        if climates:
+            planet.climates.set(climates)
+            
+        return planet
+
+    def update(self, instance, validated_data):
+        """Update planet with terrain and climate relationships"""
+        terrains = validated_data.pop('terrains', None)
+        climates = validated_data.pop('climates', None)
+        
+        # Update basic fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Update relationships if provided
+        if terrains is not None:
+            instance.terrains.set(terrains)
+        if climates is not None:
+            instance.climates.set(climates)
+            
+        return instance
 
 
     """Test cases for Planet API"""

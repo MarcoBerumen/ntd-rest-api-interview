@@ -4,10 +4,16 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-django = "*"
-djangorestframework = "*"
-python-decouple = "*"
-psycopg2-binary = "*"
+asgiref = "==3.8.1"
+django = "==5.2.1"
+djangorestframework = "==3.16.0"
+psycopg2-binary = "==2.9.10"
+python-decouple = "==3.8"
+sqlparse = "==0.5.3"
+django-filter = "*"
+requests = "*"
+urllib3 = "==2.4.0"
+pytest-django = "*"
 
 [dev-packages]
 

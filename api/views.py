@@ -6,8 +6,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import IntegrityError
-from .models import Planet
-from .serializers import PlanetSerializer
+from .models import Climate, Planet, Terrain
+from .serializers import ClimateSerializer, PlanetSerializer, TerrainSerializer
 
 # Create your views here.
 @api_view(['GET'])
@@ -27,7 +27,6 @@ class PlanetViewSet(viewsets.ModelViewSet):
     queryset = Planet.objects.all()
     serializer_class = PlanetSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    # filterset_fields = ['terrains', 'climates']
     search_fields = ['name', 'population']
     ordering_fields = ['id', 'name', 'created_at', 'updated_at']
     ordering = ['id']
@@ -51,31 +50,39 @@ class PlanetViewSet(viewsets.ModelViewSet):
                 {'error': 'A planet with this name already exists.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-    
-    # @action(detail=False, methods=['get'])
-    # def by_terrain(self, request):
-    #     """Custom endpoint to get planets by specific terrain"""
-    #     terrain = request.query_params.get('terrain')
-    #     if not terrain:
-    #         return Response(
-    #             {'error': 'terrain parameter is required'},
-    #             status=status.HTTP_400_BAD_REQUEST
-    #         )
         
-    #     planets = Planet.objects.filter(terrains__contains=[terrain])
-    #     serializer = self.get_serializer(planets, many=True)
-    #     return Response(serializer.data)
+class TerrainViewSet(viewsets.ModelViewSet):
+    queryset = Terrain.objects.all()
+    serializer_class = TerrainSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name']
+    ordering_fields = ['id', 'name', 'created_at', 'updated_at']
+    ordering = ['id']
+
+    @action(detail=True, methods=['get'])
+    def planets(self, request, pk=None):
+        """
+        Custom action to get all planets with a specific terrain.
+        """
+        terrain = self.get_object()
+        planets = terrain.planet_set.all()
+        serializer = PlanetSerializer(planets, many=True)
+        return Response(serializer.data)
     
-    # @action(detail=False, methods=['get'])
-    # def by_climate(self, request):
-    #     """Custom endpoint to get planets by specific climate"""
-    #     climate = request.query_params.get('climate')
-    #     if not climate:
-    #         return Response(
-    #             {'error': 'climate parameter is required'},
-    #             status=status.HTTP_400_BAD_REQUEST
-    #         )
-        
-    #     planets = Planet.objects.filter(climates__contains=[climate])
-    #     serializer = self.get_serializer(planets, many=True)
-    #     return Response(serializer.data)
+class ClimateViewSet(viewsets.ModelViewSet):
+    queryset = Climate.objects.all()
+    serializer_class = ClimateSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name']
+    ordering_fields = ['id', 'name', 'created_at', 'updated_at']
+    ordering = ['id']
+
+    @action(detail=True, methods=['get'])
+    def planets(self, request, pk=None):
+        """
+        Custom action to get all planets with a specific climate.
+        """
+        climate = self.get_object()
+        planets = climate.planet_set.all()
+        serializer = PlanetSerializer(planets, many=True)
+        return Response(serializer.data)
