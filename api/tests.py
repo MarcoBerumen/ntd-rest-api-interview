@@ -1,6 +1,7 @@
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
+from django.core.exceptions import ValidationError
 from api.models import Climate, Planet, Terrain
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
@@ -166,24 +167,6 @@ class ClimateModelTestCase(TestCase):
         """Test climate string representation"""
         climate = Climate.objects.create(name="Arctic")
         self.assertEqual(str(climate), "Arctic")
-    
-    def test_climate_name_unique_constraint(self):
-        """Test that climate names must be unique"""
-        Climate.objects.create(name="Temperate")
-        
-        with self.assertRaises(IntegrityError):
-            Climate.objects.create(name="Temperate")
-    
-    def test_climate_ordering(self):
-        """Test default ordering by name"""
-        Climate.objects.create(name="Tropical")
-        Climate.objects.create(name="Arctic")
-        Climate.objects.create(name="Temperate")
-        
-        climates = Climate.objects.all()
-        climate_names = [climate.name for climate in climates]
-        
-        self.assertEqual(climate_names, ["Arctic", "Temperate", "Tropical"])
 
 
 

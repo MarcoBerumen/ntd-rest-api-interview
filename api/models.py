@@ -10,8 +10,6 @@ class BaseModel(models.Model):
 class Planet(BaseModel):
     name = models.CharField(max_length=200, unique=True)
     population = models.CharField(max_length=50, null=True, blank=True)
-    # terrains = models.JSONField(null=True, blank=True) 
-    # climates = models.JSONField(null=True, blank=True)
     terrains = models.ManyToManyField('Terrain', blank=True)
     climates = models.ManyToManyField('Climate', blank=True)
 
@@ -22,15 +20,14 @@ class Planet(BaseModel):
         ordering = ['name']
 
 class Terrain(BaseModel):
-    name = models.CharField(max_length=100, unique=True, primary_key=True)
+    name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.name
     class Meta:
         ordering = ['name']
-
 class Climate(BaseModel):
-    name = models.CharField(max_length=100, unique=True,  primary_key=True)
+    name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.name

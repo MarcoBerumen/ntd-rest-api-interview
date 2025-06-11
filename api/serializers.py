@@ -20,148 +20,83 @@ class ClimateSerializer(serializers.ModelSerializer):
 
 class PlanetSerializer(serializers.ModelSerializer):
     """Serializer for Planet model with validation"""
-
-    # Nested serializers for read operations
-    terrains = TerrainSerializer(many=True, read_only=True)
-    climates = ClimateSerializer(many=True, read_only=True)
-
-     # Use SlugRelatedField to reference by name (the primary key)
-    terrain_names = serializers.SlugRelatedField(
+    terrains = serializers.SlugRelatedField(
+        many=True,
+        slug_field='name',
         queryset=Terrain.objects.all(),
+        required=False
+    )
+
+    climates = serializers.SlugRelatedField(
         many=True,
         slug_field='name',
-        source='terrains',
-        write_only=True,
-        required=False,
-        help_text="List of terrain names"
-    )
-    
-    climate_names = serializers.SlugRelatedField(
         queryset=Climate.objects.all(),
-        many=True,
-        slug_field='name',
-        source='climates',
-        write_only=True,
-        required=False,
-        help_text="List of climate names"
+        required=False
     )
-    
     class Meta:
         model = Planet
-        fields = ['id', 'name', 'population', 'terrains', 'climates', 'created_at', 'updated_at', 'climate_names', 'terrain_names']
+        fields = ['id', 'name', 'population', 'terrains', 'climates']
         read_only_fields = ['id', 'created_at', 'updated_at']
-    
-    def validate_name(self, value):
-        """Custom validation for planet name"""
-        if len(value.strip()) < 2:
-            raise serializers.ValidationError("Planet name must be at least 2 characters long.")
-        return value.strip().title()
-    
-    def create(self, validated_data):
-        """Create planet with terrain and climate relationships"""
-        terrains = validated_data.pop('terrains', [])
-        climates = validated_data.pop('climates', [])
         
+    def create(self, validated_data):
+        climates_data = validated_data.pop('climates', [])
+        terrains_data = validated_data.pop('terrains', [])
         planet = Planet.objects.create(**validated_data)
         
-        if terrains:
-            planet.terrains.set(terrains)
-        if climates:
-            planet.climates.set(climates)
-            
-        return planet
+        for climate in climates_data:
+            planet.climates.add(climate)
 
-    def update(self, instance, validated_data):
-        """Update planet with terrain and climate relationships"""
-        terrains = validated_data.pop('terrains', None)
-        climates = validated_data.pop('climates', None)
+        for terrain in terrains_data:
+            planet.terrains.add(terrain)
         
-        # Update basic fields
+        return planet
+    
+    def update(self, instance, validated_data):
+        climates_data = validated_data.pop('climates', None)
+        terrains_data = validated_data.pop('terrains', None)
+        
+        # Update other fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         
-        # Update relationships if provided
-        if terrains is not None:
-            instance.terrains.set(terrains)
-        if climates is not None:
-            instance.climates.set(climates)
-            
+        # Update climates if provided
+        if climates_data is not None:
+            instance.climates.clear()  # Remove existing relationships
+            for climate in climates_data:
+                instance.climates.add(climate)
+
+        if terrains_data is not None:
+            instance.terrains.clear()
+            for terrain in terrains_data:
+                instance.terrains.add(terrain)
+        
         return instance
+    
+    def to_internal_value(self, data):
+
+    
+        if 'climates' in data:
+            climate_names = data['climates']
+            climates = []
+            
+            for name in climate_names:
+                climate, created = Climate.objects.get_or_create(name=name)
+                climates.append(climate)
+            
+            data = data.copy()
+            data['climates'] = climates
 
 
-    """Test cases for Planet API"""
-    
-    def setUp(self):
-        self.planet_data = {
-            'name': 'Earth',
-            'population': '7.8 billion',
-            'terrains': ['ocean', 'grassland', 'desert'],
-            'climates': ['temperate', 'tropical']
-        }
-        self.planet = Planet.objects.create(**self.planet_data)
-    
-    def test_create_planet(self):
-        """Test creating a new planet"""
-        url = reverse('planet-list')
-        data = {
-            'name': 'Mars',
-            'population': '0',
-            'terrains': ['desert'],
-            'climates': ['arid']
-        }
-        response = self.client.post(url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Planet.objects.count(), 2)
-    
-    def test_get_planet_list(self):
-        """Test retrieving planet list"""
-        url = reverse('planet-list')
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data['results']), 1)
-    
-    def test_get_planet_detail(self):
-        """Test retrieving a specific planet"""
-        url = reverse('planet-detail', kwargs={'pk': self.planet.pk})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['name'], 'Earth')
-    
-    def test_update_planet(self):
-        """Test updating a planet"""
-        url = reverse('planet-detail', kwargs={'pk': self.planet.pk})
-        data = {'population': '8 billion'}
-        response = self.client.patch(url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.planet.refresh_from_db()
-        self.assertEqual(self.planet.population, '8 billion')
-    
-    def test_delete_planet(self):
-        """Test deleting a planet"""
-        url = reverse('planet-detail', kwargs={'pk': self.planet.pk})
-        response = self.client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(Planet.objects.count(), 0)
-    
-    def test_search_planets(self):
-        """Test searching planets"""
-        url = reverse('planet-list')
-        response = self.client.get(url, {'search': 'Earth'})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data['results']), 1)
-    
-    def test_filter_by_terrain(self):
-        """Test custom terrain filter endpoint"""
-        url = reverse('planet-by-terrain')
-        response = self.client.get(url, {'terrain': 'ocean'})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-    
-    def test_duplicate_name_validation(self):
-        """Test that duplicate planet names are not allowed"""
-        url = reverse('planet-list')
-        data = self.planet_data.copy()
-        response = self.client.post(url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('error', response.data)
+        if 'terrains' in data:
+            terrain_names = data['terrains']
+            terrains = []
+            
+            for name in terrain_names:
+                terrain, created = Terrain.objects.get_or_create(name=name)
+                terrains.append(terrain)
+            
+            data = data.copy()
+            data['terrains'] = terrains       
+
+        return super().to_internal_value(data)
